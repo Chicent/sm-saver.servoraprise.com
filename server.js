@@ -8,10 +8,35 @@ let callCount = 0;
 
 app.get('/download', async (req, res) => {
   const url = req.query.url;
-  console.log("Received URL:", url); // ✅ Add this line
+  console.log("Received URL:", url); // ✅ Log the incoming request
 
   if (!url) return res.status(400).send('❌ URL required');
   if (callCount >= MAX_CALLS) return res.status(429).send('❌ API Limit reached');
+
+  // Detect platform
+  const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+  const isInstagram = url.includes('instagram.com');
+  const isFacebook = url.includes('facebook.com');
+
+  // Prepare request body
+  const body = {
+    url,
+    proxySettings: {
+      useApifyProxy: true,
+      apifyProxyGroups: ['RESIDENTIAL'],
+      apifyProxyCountry: 'US'
+    }
+  };
+
+  // Merge AV if Facebook or Instagram
+  if (isInstagram || isFacebook) {
+    body.mergeAV = true;
+  }
+
+  // Merge AV for YouTube with quality
+  if (isYouTube) {
+    body.mergeYoutube = { quality: 720 };
+  }
 
   try {
     const run = await fetch(
@@ -19,30 +44,31 @@ app.get('/download', async (req, res) => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify(body),
       }
     ).then(r => r.json());
 
     callCount++;
     const items = run.items || [];
+    console.log("Apify items:", items); // ✅ Log the response
 
-    // ✅ Debug: print the response to console
-    console.log("Apify items:", items);
+    // ✅ Extract the most reliable download link
+    const downloadUrl = items[0]?.download?.[0]?.url ||
+                        items[0]?.formats?.[0]?.url ||
+                        items[0]?.video_urls?.[0]?.url ||
+                        items[0]?.videoUrl ||
+                        items[0]?.url;
 
-    // ✅ Extract video URL safely (handles fallback cases)
-    const videoUrl = items[0]?.videoUrl || items[0]?.video_urls?.[0]?.url || items[0]?.url;
-
-    if (!videoUrl) {
+    if (!downloadUrl) {
       return res.send(`
         <h2>❌ No downloadable link found.</h2>
-        <p>It might be a private or unsupported post.</p>
-        <p>Try a different video or use one of our sibling savers.</p>
+        <p>This may be due to privacy settings, unsupported post, or missing proxy/merge config.</p>
       `);
     }
 
     res.send(`
       <h2>✅ Download Ready</h2>
-      <a href="${videoUrl}" download>Click to Download</a>
+      <a href="${downloadUrl}" download>Click to Download</a>
       <p>Calls left: ${MAX_CALLS - callCount}</p>
     `);
   } catch (e) {
@@ -51,7 +77,7 @@ app.get('/download', async (req, res) => {
   }
 });
 
-// ✅ Fixes the "Cannot GET /" issue
+// ✅ Fixes "Cannot GET /" issue
 app.get('/', (req, res) => {
   res.send('✅ SM Saver API is live and running!');
 });
