@@ -37,4 +37,9 @@ app.get('/download', async (req, res) => {
   }
 });
 
+// ✅ Add this route to fix “Cannot GET /”
+app.get('/', (req, res) => {
+  res.send('✅ SM Saver API is live and running!');
+});
+
 app.listen(process.env.PORT || 3000, () => console.log('Server started'));
