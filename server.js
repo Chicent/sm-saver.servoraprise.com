@@ -8,6 +8,8 @@ let callCount = 0;
 
 app.get('/download', async (req, res) => {
   const url = req.query.url;
+  console.log("Received URL:", url); // ✅ Add this line
+
   if (!url) return res.status(400).send('❌ URL required');
   if (callCount >= MAX_CALLS) return res.status(429).send('❌ API Limit reached');
 
